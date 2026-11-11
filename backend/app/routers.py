@@ -25,7 +25,8 @@ def _db(request: Request):
 # ---- basics ----
 @api.get("/version")
 async def version(request: Request) -> dict[str, Any]:
-    return {"app": "zwave-observatory", "version": "0.1.0", "port": get_config().port}
+    return {"app": "zwave-observatory", "version": "0.1.0", "api": "0.1.6",
+            "port": get_config().port}
 
 
 @api.get("/controller")
@@ -212,12 +213,32 @@ def _iso_now() -> str:
 # ---- problems / score ----
 @api.get("/problems")
 async def problems(request: Request) -> list[dict[str, Any]]:
-    return _state(request).get_problems()
+    st = _state(request)
+    out = []
+    for p in st.get_problems():
+        key = f"{p.get('type')}-{p.get('node_id')}"
+        out.append({
+            "id": key,
+            "severity": p.get("severity") or "medium",
+            "type": p.get("type") or "unknown",
+            "node_id": p.get("node_id"),
+            "message": p.get("message") or "",
+            "first_seen": _iso_now(),
+            "trend": 0,
+            "dismissed_until": None,
+            "evidence": [],
+        })
+    return out
 
 
 @api.get("/score")
 async def score(request: Request) -> dict[str, Any]:
     st = _state(request)
+    if not st.nodes:
+        try:
+            await st.refresh()
+        except Exception as e:
+            raise HTTPException(503, f"cannot reach zwave-js-server: {e}")
     s = st.get_score()
     net = s.get("network") or {}
     total = net.get("total")
@@ -239,10 +260,10 @@ async def score(request: Request) -> dict[str, Any]:
 
 # ---- history ----
 @api.get("/history/frames")
-async def history_frames(request: Request, days: int = 7) -> dict[str, Any]:
+async def history_frames(request: Request, days: int = 7) -> list[dict[str, Any]]:
     st = _state(request)
     if not st.influx:
-        return {"data": [], "error": "influx not configured"}
+        return []
     try:
         return {"data": await st.influx.query(
             f'from(bucket:"zwave") |> range(start: -{days}d) '
@@ -252,10 +273,10 @@ async def history_frames(request: Request, days: int = 7) -> dict[str, Any]:
 
 
 @api.get("/history/rssi")
-async def history_rssi(request: Request, days: int = 7) -> dict[str, Any]:
+async def history_rssi(request: Request, days: int = 7) -> list[dict[str, Any]]:
     st = _state(request)
     if not st.influx:
-        return {"data": [], "error": "influx not configured"}
+        return []
     try:
         return {"data": await st.influx.query(
             f'from(bucket:"zwave") |> range(start: -{days}d) '
@@ -265,10 +286,10 @@ async def history_rssi(request: Request, days: int = 7) -> dict[str, Any]:
 
 
 @api.get("/history/controller")
-async def history_controller(request: Request, days: int = 7) -> dict[str, Any]:
+async def history_controller(request: Request, days: int = 7) -> list[dict[str, Any]]:
     st = _state(request)
     if not st.influx:
-        return {"data": [], "error": "influx not configured"}
+        return []
     try:
         return {"data": await st.influx.controller_history(days)}
     except Exception as e:
@@ -276,10 +297,10 @@ async def history_controller(request: Request, days: int = 7) -> dict[str, Any]:
 
 
 @api.get("/history/drops")
-async def history_drops(request: Request, days: int = 7) -> dict[str, Any]:
+async def history_drops(request: Request, days: int = 7) -> list[dict[str, Any]]:
     st = _state(request)
     if not st.influx:
-        return {"data": [], "error": "influx not configured"}
+        return []
     try:
         return {"data": await st.influx.query(
             f'from(bucket:"zwave") |> range(start: -{days}d) '
