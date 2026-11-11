@@ -2,20 +2,39 @@ name: zwave-observatory
 
 services:
   zwave-observatory:
-    # Official image on Docker Hub. Replace `local` with your Docker Hub
-    # username, or set DOCKERHUB_USERNAME in .env. A ghcr.io mirror may be
-    # published in the future; the Docker Hub image is the primary reference.
-    image: docker.io/${DOCKERHUB_USERNAME:-local}/zwave-observatory:latest
+    # Official image on Docker Hub. Replace the default username with your
+    # own, or set DOCKERHUB_USERNAME in .env.
+    image: docker.io/${DOCKERHUB_USERNAME:-skidder}/zwave-observatory:latest
     # To build locally instead of pulling:
     # build: .
     container_name: zwave-observatory
     ports:
       - "${PORT:-8088}:8088"
-    env_file:
-      - path: .env
-        required: false
     environment:
+      # Core backends. Leave empty and the first-run wizard validates and
+      # writes them to data/secrets.env on boot.
+      - HASS_URL=${HASS_URL:-}
+      - HASS_TOKEN=${HASS_TOKEN:-}
+      - ZWJS_WS_URL=${ZWJS_WS_URL:-}
+      - ZWJS_TOKEN=${ZWJS_TOKEN:-}
+      # InfluxDB v2 (bucket: homeassistant).
+      - INFLUXDB_URL=${INFLUXDB_URL:-}
+      - INFLUXDB_ORG=${INFLUXDB_ORG:-}
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN:-}
+      # LLM advisor. Provider: anthropic (default) | openai | openai_compatible.
+      - LLM_PROVIDER=${LLM_PROVIDER:-anthropic}
+      - LLM_MODEL=${LLM_MODEL:-claude-sonnet-4-5}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_BASE_URL=${LLM_BASE_URL:-}
+      - LLM_MAX_TOKENS=${LLM_MAX_TOKENS:-}
+      - LLM_DAILY_TOKEN_CAP=${LLM_DAILY_TOKEN_CAP:-200000}
+      # App settings.
+      - DATA_DIR=/data
       - TZ=${TZ:-UTC}
+    # Compose reads .env from this directory for the ${VAR} substitutions
+    # above. To source a differently named secrets file instead, uncomment:
+    # env_file:
+    #   - .env.secrets
     volumes:
       - ./data:/data
     restart: unless-stopped
