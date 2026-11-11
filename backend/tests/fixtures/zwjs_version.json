@@ -1,0 +1,10 @@
+{
+  "type": "version",
+  "versionInfo": {
+    "serverVersion": "1.32.4",
+    "schemaVersion": 42,
+    "homeId": "0x9a1b2c3d",
+    "minSchemaVersion": 0
+  },
+  "maxSchemaVersion": 42
+}

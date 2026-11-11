@@ -1,0 +1,106 @@
+.card {
+  background: var(--panel);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px 16px;
+}
+
+.stagger { animation: cardIn 350ms ease both; }
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+.btn {
+  border: 1px solid var(--grid);
+  background: var(--panel-2);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btn:hover:not(:disabled) { filter: brightness(1.05); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+.chip {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  border: 1px solid var(--grid);
+  font-size: 0.78rem;
+  margin: 2px;
+  cursor: pointer;
+}
+.chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+table.data { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+table.data th {
+  text-align: left; font-weight: 600; color: var(--text-dim);
+  border-bottom: 1px solid var(--grid); padding: 6px 8px;
+}
+table.data td { border-bottom: 1px solid var(--grid); padding: 6px 8px; }
+table.data tr.clickable { cursor: pointer; }
+table.data tr.clickable:hover { background: var(--panel-2); }
+
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+  display: flex; align-items: center; justify-content: center; z-index: 100;
+}
+.modal {
+  background: var(--panel); border-radius: var(--radius);
+  padding: 18px 20px; width: min(440px, 92vw); box-shadow: var(--shadow);
+}
+
+.drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; width: 380px;
+  background: var(--panel); box-shadow: var(--shadow);
+  z-index: 90; overflow-y: auto; padding: 16px 18px;
+  animation: slideIn 220ms ease both;
+}
+@keyframes slideIn { from { transform: translateX(40px); opacity: 0.4; } to { transform: none; opacity: 1; } }
+.drawer-close {
+  position: sticky; top: 0; float: right;
+  background: none; border: none; color: var(--text-dim);
+  font-size: 1.2rem; cursor: pointer;
+}
+@media (max-width: 640px) {
+  .drawer { width: 100vw; }
+}
+
+.app-shell { max-width: 1280px; margin: 0 auto; padding: 12px 16px 40px; }
+.app-header { display: flex; align-items: center; gap: 14px; padding: 8px 0 14px; flex-wrap: wrap; }
+.app-header h1 { font-size: 1.15rem; margin: 0; }
+nav.tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+nav.tabs button {
+  border: none; background: none; color: var(--text-dim);
+  font: inherit; font-weight: 600; padding: 6px 12px; border-radius: 999px; cursor: pointer;
+}
+nav.tabs button.active { background: var(--panel-2); color: var(--text); }
+
+.grid { display: grid; gap: 14px; }
+.grid.cols-2 { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+.grid.cols-3 { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+
+.stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.stat-grid > div { background: var(--panel-2); border-radius: 8px; padding: 8px 10px; }
+.stat-label { font-size: 0.72rem; color: var(--text-dim); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.stat-value { font-size: 1.1rem; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+.dim { color: var(--text-dim); }
+.row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mt { margin-top: 10px; }
+.warn-block {
+  background: var(--panel-2); border-left: 3px solid var(--warn);
+  padding: 8px 10px; border-radius: 4px; font-size: 0.85rem; margin-top: 8px;
+}
+input[type='text'], input[type='password'], input[type='number'], select {
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--grid);
+  border-radius: 8px; padding: 6px 10px; font: inherit; width: 100%; box-sizing: border-box;
+}
+details > summary { cursor: pointer; color: var(--accent); font-weight: 600; font-size: 0.88rem; }

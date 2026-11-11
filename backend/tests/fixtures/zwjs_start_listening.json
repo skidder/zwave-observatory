@@ -1,0 +1,49 @@
+{
+  "type": "result",
+  "messageId": "start-listening",
+  "success": true,
+  "schemaVersion": 42,
+  "result": {
+    "state": {
+      "nodes": [
+        {
+          "nodeId": 1,
+          "name": "Controller",
+          "isControllerNode": true,
+          "ready": true,
+          "status": "alive",
+          "deviceClass": {"label": "Z-Wave Controller", "role": "controller"},
+          "manufacturer": "Aeotec",
+          "productLabel": "Z-Stick Gen5+",
+          "neighbors": [],
+          "values": [],
+          "statistics": {"commandsTX": 10, "commandsRX": 20, "commandsDroppedTX": 0,
+                          "commandsDroppedRX": 0, "timeoutResponse": 0, "rssi": -42},
+          "lastSeen": "2026-11-11T03:04:05.000Z"
+        },
+        {
+          "nodeId": 5,
+          "name": "Living Room Dimmer",
+          "location": "Living Room",
+          "isControllerNode": false,
+          "ready": true,
+          "status": "alive",
+          "deviceClass": {"label": "Binary Switch", "role": "end-node"},
+          "manufacturer": "Zooz",
+          "productLabel": "ZEN27",
+          "deviceConfig": {"deviceId": "271-4097-4098"},
+          "neighbors": [1, 7],
+          "lwr": {"rssi": -63},
+          "values": [
+            {"commandClass": 112, "property": 3, "value": 3,
+             "metadata": {"min": 0, "max": 10, "states": {"0": "off", "3": "3"}}}
+          ],
+          "statistics": {"commandsTX": 100, "commandsRX": 200, "commandsDroppedTX": 2,
+                          "commandsDroppedRX": 25, "timeoutResponse": 7, "rtt": 80,
+                          "rssi": -80, "snr": 12},
+          "lastSeen": "2026-11-11T03:04:05.000Z"
+        }
+      ]
+    }
+  }
+}

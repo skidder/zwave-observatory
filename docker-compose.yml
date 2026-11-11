@@ -1,0 +1,45 @@
+name: zwave-observatory
+
+services:
+  zwave-observatory:
+    # Official image on Docker Hub. Replace `local` with your Docker Hub
+    # username, or set DOCKERHUB_USERNAME in .env. A ghcr.io mirror may be
+    # published in the future; the Docker Hub image is the primary reference.
+    image: docker.io/${DOCKERHUB_USERNAME:-local}/zwave-observatory:latest
+    # To build locally instead of pulling:
+    # build: .
+    container_name: zwave-observatory
+    ports:
+      - "${PORT:-8088}:8088"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - TZ=${TZ:-UTC}
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+
+  # Optional: local LLM advisor via Ollama. Enable with:
+  #   docker compose --profile local-llm up -d
+  # Then set in .env:
+  #   LLM_PROVIDER=openai_compatible
+  #   LLM_MODEL=qwen3:8b
+  #   LLM_BASE_URL=http://ollama:11434/v1
+  # Note: qwen3:8b needs roughly 8GB of free RAM.
+  #
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   profiles:
+  #     - local-llm
+  #   volumes:
+  #     - ./data/ollama:/root/.ollama
+  #   restart: unless-stopped
+
+  # Optional: join an existing external Docker network (for example one
+  # shared with Home Assistant) instead of the default network.
+  #
+  # networks:
+  #   default:
+  #     name: my-existing-network
+  #     external: true
