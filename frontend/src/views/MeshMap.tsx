@@ -76,7 +76,13 @@ export default function MeshMap({ onOpenNode }: { onOpenNode: (id: number) => vo
       elements,
       layout: (graph.edges.length
         ? { name: 'cose-bilkent', animate: false, idealEdgeLength: 140, nodeRepulsion: 16000, padding: 40, gravityRange: 2.2, randomize: true }
-        : { name: 'grid', animate: false, padding: 40, avoidOverlap: true, spacingFactor: 1.6, condense: false, rows: undefined }) as never,
+        : ({
+            name: 'concentric', animate: false, padding: 40,
+            concentric: (n: cytoscape.NodeSingular) => n.data('dead') ? 10 : n.data('sleeping') ? 40 : 70,
+            levelWidth: () => 30,
+            startAngle: (3 / 4) * Math.PI * 2,
+            sweep: Math.PI,
+          }) as never) as never,
       wheelSensitivity: 0.2,
       style: ([
         {
@@ -149,14 +155,13 @@ export default function MeshMap({ onOpenNode }: { onOpenNode: (id: number) => vo
           <Btn onClick={() => mesh.reload()}>Refresh</Btn>
         </div>
       </div>
+      <div className="dim" style={{ fontSize: '0.8rem', marginBottom: 8 }}>
+        No topology data: zwave-js driver 15+ no longer reports node neighbors or LWR/NLWR routes
+        (deprecated upstream), so the map shows a health view: controller centered, dead nodes on the
+        outer rim, sleeping nodes mid-ring. Edge lines will appear automatically if a future
+        zwave-js version restores topology data.
+      </div>
       <div ref={containerRef} style={{ height: 560, border: '1px solid var(--grid)', borderRadius: 'var(--radius)' }} />
-      {mesh.data && mesh.data.edges.length === 0 && (
-        <div className="dim" style={{ fontSize: '0.8rem', marginTop: 6 }}>
-          No topology data: your zwave-js-server did not report node neighbors or LWR/NLWR routes,
-          so the map shows health-only nodes. Run a network heal or re-interview a node in zwave-js-ui
-          to populate routing tables, then Refresh.
-        </div>
-      )}
       <div className="row dim mt" style={{ fontSize: '0.78rem', gap: 16 }}>
         <span>● mains</span><span>◆ battery</span>
         <span>— solid LWR (RSSI labeled)</span><span>╌ dashed NLWR</span><span>faint neighbor links</span>
