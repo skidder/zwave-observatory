@@ -99,6 +99,47 @@ async def _run_action(request: Request, action: str, node_id: int,
     return result
 
 
+@api.get("/mesh")
+async def mesh(request: Request) -> dict[str, Any]:
+    st = _state(request)
+    if not st.nodes:
+        try:
+            await st.refresh()
+        except Exception as e:
+            raise HTTPException(503, f"cannot reach zwave-js-server: {e}")
+    nodes: list[dict[str, Any]] = []
+    edges: list[dict[str, Any]] = []
+    for n in st.nodes:
+        nid = n["node_id"]
+        nodes.append({
+            "node_id": nid,
+            "name": n.get("name"),
+            "status": n.get("status"),
+            "is_controller_node": n.get("is_controller_node", False),
+            "power_source": n.get("power_source"),
+            "health_score": n.get("health_score"),
+        })
+        seen: set[int] = set()
+        for target in n.get("neighbors") or []:
+            if isinstance(target, int) and target != nid and target not in seen:
+                seen.add(target)
+                edges.append({"source": nid, "target": target, "kind": "neighbor"})
+        routes = n.get("routes") or {}
+        for kind in ("lwr", "nlwr"):
+            r = routes.get(kind)
+            if r and isinstance(r.get("nodeId"), int):
+                edges.append({"source": nid, "target": r["nodeId"], "kind": kind,
+                              "rssi": r.get("rssi")})
+    return {"nodes": nodes, "edges": edges,
+            "routes_as_of": (st.last_refresh_iso if hasattr(st, "last_refresh_iso")
+                             else None) or _iso_now()}
+
+
+def _iso_now() -> str:
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat()
+
+
 # ---- problems / score ----
 @api.get("/problems")
 async def problems(request: Request) -> list[dict[str, Any]]:
