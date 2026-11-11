@@ -9,7 +9,7 @@ import asyncio
 import json
 from typing import Any, AsyncIterator, Callable
 
-DEFAULT_MIN_SCHEMA = 0  # we advertise the lowest; server replies with its max
+DEFAULT_MIN_SCHEMA = 0  # we advertise the lowest; the server replies with its max
 
 
 class ZwjsError(RuntimeError):

@@ -45,17 +45,25 @@ export default function MeshMap({ onOpenNode }: { onOpenNode: (id: number) => vo
 
     const elements: ElementDefinition[] = graph.nodes
       .filter((n) => !hiddenIds.has(n.id))
-      .map((n) => ({
-        data: {
-          id: `n${n.id}`,
-          label: n.label,
-          color: gradeColor(n.grade),
-          controller: n.is_controller,
-          power: n.power,
-          sleeping: n.sleeping,
-          dead: n.dead,
-        },
-      }));
+      .map((n) => {
+        const cls = ['node'];
+        if (n.is_controller) cls.push('controller');
+        if (n.power === 'battery') cls.push('battery');
+        if (n.sleeping) cls.push('sleeping');
+        if (n.dead) cls.push('dead');
+        return {
+          data: {
+            id: `n${n.id}`,
+            label: n.label,
+            color: gradeColor(n.grade),
+            controller: n.is_controller,
+            power: n.power,
+            sleeping: n.sleeping,
+            dead: n.dead,
+          },
+          classes: cls.join(' '),
+        };
+      });
     for (const e of graph.edges) {
       if (hiddenIds.has(e.source) || hiddenIds.has(e.target)) continue;
       elements.push({
@@ -66,45 +74,53 @@ export default function MeshMap({ onOpenNode }: { onOpenNode: (id: number) => vo
     const cy = cytoscape({
       container: containerRef.current,
       elements,
-      layout: { name: 'cose-bilkent', animate: false, idealEdgeLength: 110, nodeRepulsion: 8000 } as never,
-      style: [
+      layout: (graph.edges.length
+        ? { name: 'cose-bilkent', animate: false, idealEdgeLength: 140, nodeRepulsion: 16000, padding: 40, gravityRange: 2.2, randomize: true }
+        : { name: 'grid', animate: false, padding: 40, avoidOverlap: true, spacingFactor: 1.6, condense: false, rows: undefined }) as never,
+      wheelSensitivity: 0.2,
+      style: ([
         {
           selector: 'node',
           style: {
             label: 'data(label)',
             'background-color': 'data(color)',
             color: text,
-            'font-size': 10,
-            width: 26,
-            height: 26,
+            'font-size': 9,
+            width: 24,
+            height: 24,
             'text-valign': 'bottom',
-            'text-margin-y': 4,
+            'text-margin-y': 5,
+            'text-wrap': 'wrap',
+            'text-max-width': 110,
+            'text-justification': 'center',
+            'min-zoomed-font-size': 5,
           },
         },
         {
-          selector: 'node[controller]',
+          selector: 'node.controller',
           style: {
-            width: 42, height: 42,
-            'border-width': 6, 'border-color': cssVar('--accent', '#1A5276'),
+            width: 44, height: 44,
+            'border-width': 5, 'border-color': cssVar('--accent', '#1A5276'),
             'background-color': cssVar('--accent', '#1A5276'),
           },
         },
-        { selector: 'node[power = "battery"]', style: shapeDiamond() },
-        { selector: 'node[sleeping]', style: { opacity: 0.55 } },
-        { selector: 'node[dead]', style: { opacity: 0.3, 'background-color': cssVar('--danger', '#C0392B') } },
+        { selector: 'node.battery', style: shapeDiamond() },
+        { selector: 'node.sleeping', style: { opacity: 0.65 } },
+        { selector: 'node.dead', style: { opacity: 0.45, 'background-color': cssVar('--danger', '#C0392B') } },
         {
           selector: 'edge[kind = "lwr"]',
-          style: { 'line-color': grid, width: 2 },
+          style: { 'line-color': cssVar('--accent', '#1A5276'), width: 2.5, 'curve-style': 'straight' },
         },
         { selector: 'edge[kind = "nlwr"]', style: { 'line-style': 'dashed', 'line-color': cssVar('--edge-nlwr', '#888'), width: 1.5 } },
-        { selector: 'edge[kind = "neighbor"]', style: { 'line-color': bg, width: 1, opacity: 0.5 } },
-      ],
+        { selector: 'edge[kind = "neighbor"]', style: { 'line-color': grid, width: 1, opacity: 0.35 } },
+      ] as never),
     });
     // LWR edges labeled with RSSI.
     cy.edges('[kind = "lwr"]').style('label', (el: cytoscape.EdgeSingular) => {
       const rssi = el.data('rssi');
       return rssi != null ? `${rssi} dBm` : '';
-    });
+    }).style({ 'font-size': 8, color: text, 'text-background-color': bg, 'text-background-opacity': 0.8, 'text-background-padding': 2 });
+    cy.fit(undefined, 40);
     cy.on('tap', 'node', (evt) => {
       const id = Number(evt.target.id().replace(/^n/, ''));
       onOpenNode(id);
@@ -134,6 +150,13 @@ export default function MeshMap({ onOpenNode }: { onOpenNode: (id: number) => vo
         </div>
       </div>
       <div ref={containerRef} style={{ height: 560, border: '1px solid var(--grid)', borderRadius: 'var(--radius)' }} />
+      {mesh.data && mesh.data.edges.length === 0 && (
+        <div className="dim" style={{ fontSize: '0.8rem', marginTop: 6 }}>
+          No topology data: your zwave-js-server did not report node neighbors or LWR/NLWR routes,
+          so the map shows health-only nodes. Run a network heal or re-interview a node in zwave-js-ui
+          to populate routing tables, then Refresh.
+        </div>
+      )}
       <div className="row dim mt" style={{ fontSize: '0.78rem', gap: 16 }}>
         <span>● mains</span><span>◆ battery</span>
         <span>— solid LWR (RSSI labeled)</span><span>╌ dashed NLWR</span><span>faint neighbor links</span>
