@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from .advisor import Advisor, LLMClient, build_context_packet
 from .config import get_config, reload_config_with_secrets
 from .db import Database
-from .routers import api
+from .routers import api, ws_router
 from .state import AppState
 
 log = logging.getLogger("zwave-observatory")
@@ -39,6 +39,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI(title="Z-Wave Health Observatory", lifespan=lifespan)
     app.include_router(api)
+    app.include_router(ws_router)
     _mount_statics(app)
     return app
 

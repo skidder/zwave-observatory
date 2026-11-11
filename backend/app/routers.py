@@ -162,7 +162,12 @@ async def history_drops(request: Request, days: int = 7) -> dict[str, Any]:
 
 
 # ---- WS live ----
-@api.websocket("/ws/live")
+# Registered on its own router (no /api prefix): the SPA dials /ws/live at
+# the host root, matching the documented contract.
+ws_router = APIRouter()
+
+
+@ws_router.websocket("/ws/live")
 async def ws_live(websocket: WebSocket) -> None:
     await websocket.accept()
     st = websocket.app.state.state
