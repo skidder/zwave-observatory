@@ -34,20 +34,44 @@ export default function Overview({ onOpenNode }: { onOpenNode: (id: number) => v
     }],
   }), [score.data]) as never;
 
+  const frames = useApi(() => api.history('frames', 7));
+
   const frameOption = useMemo(() => {
     const nodesList = nodes.data ?? [];
     const days = 7;
-    // Mock day labels; backend history endpoint is the source of truth when wired.
-    const ts = Array.from({ length: days }, (_, i) => {
-      const d = new Date(Date.now() - (days - 1 - i) * 86400000);
-      return d.toISOString().slice(5, 10);
-    });
-    const series = nodesList.slice(0, 10).map((n) => ({
-      name: n.name || `Node ${n.id}`,
-      type: 'bar' as const,
-      stack: 'frames',
-      data: ts.map(() => Math.max(0, Math.round(n.stats.tx / days + (n.id % 7) * 3))),
-    }));
+    // Real data path: /api/history/frames returns [{node_id, day, frames}].
+    const real = (Array.isArray(frames.data) ? frames.data : []) as unknown as { node_id: number; day: string; frames: number }[];
+    let ts: string[] = [];
+    let series: { name: string; type: 'bar'; stack: string; data: number[] }[] = [];
+    if (real.length > 0) {
+      ts = [...new Set(real.map((r: { day: string }) => r.day))].sort();
+      const byNode = new Map<number, Map<string, number>>();
+      for (const r of real) {
+        if (!byNode.has(r.node_id)) byNode.set(r.node_id, new Map());
+        byNode.get(r.node_id)!.set(r.day, r.frames);
+      }
+      series = [...byNode.keys()].slice(0, 10).map((nid) => {
+        const n = nodesList.find((x: ZwaveNode) => x.id === nid);
+        return {
+          name: n ? (n.name || `Node ${nid}`) : `Node ${nid}`,
+          type: 'bar' as const,
+          stack: 'frames',
+          data: ts.map((d) => byNode.get(nid)!.get(d) ?? 0),
+        };
+      });
+    } else {
+      // Fallback: deterministic per-node filler until Influx sampling accrues 2+ days.
+      ts = Array.from({ length: days }, (_, i) => {
+        const d = new Date(Date.now() - (days - 1 - i) * 86400000);
+        return d.toISOString().slice(5, 10);
+      });
+      series = nodesList.slice(0, 10).map((n: ZwaveNode) => ({
+        name: n.name || `Node ${n.id}`,
+        type: 'bar' as const,
+        stack: 'frames',
+        data: ts.map(() => Math.max(0, Math.round(n.stats.tx / days + (n.id % 7) * 3))),
+      }));
+    }
     return {
       tooltip: { trigger: 'axis' },
       legend: { top: 0, type: 'scroll', textStyle: { color: 'var(--text-dim)', fontSize: 10 } },
@@ -56,7 +80,7 @@ export default function Overview({ onOpenNode }: { onOpenNode: (id: number) => v
       yAxis: { type: 'value', axisLine: { lineStyle: { color: 'var(--grid)' } }, splitLine: { lineStyle: { color: 'var(--grid)' } } },
       series,
     };
-  }, [nodes.data]) as never;
+  }, [nodes.data, frames.data]) as never;
 
   return (
     <div className="grid cols-2">

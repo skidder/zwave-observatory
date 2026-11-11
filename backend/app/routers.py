@@ -266,9 +266,7 @@ async def history_frames(request: Request, days: int = 7) -> list[dict[str, Any]
     if not st.influx:
         return []
     try:
-        return {"data": await st.influx.query(
-            f'from(bucket:"zwave") |> range(start: -{days}d) '
-            f'|> filter(fn:(r) => r._measurement == "zwave_frames")')}
+        return await st.influx.frames_all(days)
     except Exception as e:
         raise HTTPException(502, str(e))
 
@@ -279,9 +277,9 @@ async def history_rssi(request: Request, days: int = 7) -> list[dict[str, Any]]:
     if not st.influx:
         return []
     try:
-        return {"data": await st.influx.query(
-            f'from(bucket:"zwave") |> range(start: -{days}d) '
-            f'|> filter(fn:(r) => r._measurement == "zwave_rssi")')}
+        return await st.influx.query(
+            f'from(bucket:"{st.influx.bucket}") |> range(start: -{days}d) '
+            f'|> filter(fn:(r) => r._measurement == "zwave_rssi")')
     except Exception as e:
         raise HTTPException(502, str(e))
 
@@ -292,7 +290,7 @@ async def history_controller(request: Request, days: int = 7) -> list[dict[str, 
     if not st.influx:
         return []
     try:
-        return {"data": await st.influx.controller_history(days)}
+        return await st.influx.controller_history(days)
     except Exception as e:
         raise HTTPException(502, str(e))
 
@@ -303,9 +301,9 @@ async def history_drops(request: Request, days: int = 7) -> list[dict[str, Any]]
     if not st.influx:
         return []
     try:
-        return {"data": await st.influx.query(
-            f'from(bucket:"zwave") |> range(start: -{days}d) '
-            f'|> filter(fn:(r) => r._measurement == "zwave_drops")')}
+        return await st.influx.query(
+            f'from(bucket:"{st.influx.bucket}") |> range(start: -{days}d) '
+            f'|> filter(fn:(r) => r._measurement == "zwave_drops")')
     except Exception as e:
         raise HTTPException(502, str(e))
 

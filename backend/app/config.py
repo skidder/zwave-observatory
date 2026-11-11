@@ -22,6 +22,7 @@ class Config:
     zwjs_token: str | None = None
     influx_url: str = ""
     influx_org: str = ""
+    influx_bucket: str = "homeassistant"
     influx_token: str | None = None
     llm_provider: str = "anthropic"
     llm_model: str = "claude-sonnet-4-5"
@@ -46,6 +47,7 @@ class Config:
             zwjs_token=_env("ZWJS_TOKEN"),
             influx_url=_env("INFLUXDB_URL", "") or "",
             influx_org=_env("INFLUXDB_ORG", "") or "",
+            influx_bucket=_env("INFLUXDB_BUCKET", "") or "homeassistant",
             influx_token=_env("INFLUXDB_TOKEN"),
             llm_provider=_env("LLM_PROVIDER", "anthropic") or "anthropic",
             llm_model=_env("LLM_MODEL", "claude-sonnet-4-5") or "claude-sonnet-4-5",

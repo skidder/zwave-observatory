@@ -26,6 +26,7 @@ class AppState:
         self.ha = HAClient(cfg.hass_url, cfg.hass_token or "")
         self.zwjs = ZwjsClient(cfg.zwjs_ws_url, cfg.zwjs_token)
         self.influx = InfluxClient(cfg.influx_url, cfg.influx_org,
+                                   cfg.influx_bucket,
                                    cfg.influx_token or "") if cfg.influx_configured() else None
         self.actions = ActionManager(db)
         self.nodes: list[dict[str, Any]] = []

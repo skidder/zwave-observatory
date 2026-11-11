@@ -20,6 +20,7 @@ services:
       # InfluxDB v2 (bucket: homeassistant).
       - INFLUXDB_URL=${INFLUXDB_URL:-}
       - INFLUXDB_ORG=${INFLUXDB_ORG:-}
+      - INFLUXDB_BUCKET=${INFLUXDB_BUCKET:-homeassistant}
       - INFLUXDB_TOKEN=${INFLUXDB_TOKEN:-}
       # LLM advisor. Provider: anthropic (default) | openai | openai_compatible.
       - LLM_PROVIDER=${LLM_PROVIDER:-anthropic}

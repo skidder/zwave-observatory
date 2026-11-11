@@ -34,8 +34,12 @@ def create_app() -> FastAPI:
         app.state.db = db
         app.state.advisor = advisor
         task = asyncio.create_task(_nightly_scheduler(app))
+        if app.state.state.influx:
+            app.state._sampler = asyncio.create_task(_influx_sampler(app))
         yield
         task.cancel()
+        if app.state.state.influx:
+            app.state._sampler.cancel()
 
     app = FastAPI(title="Z-Wave Health Observatory", lifespan=lifespan)
     app.include_router(api)
@@ -58,6 +62,25 @@ def _mount_statics(app: FastAPI) -> None:
                 return FileResponse(index)
             return {"app": "zwave-observatory",
                     "status": "no SPA built; API available under /api"}
+
+
+async def _influx_sampler(app: FastAPI) -> None:
+    """Sample node counters into InfluxDB every 10 minutes so history charts
+    use real data. Each cycle also refreshes the node cache."""
+    st = app.state.state
+    while True:
+        try:
+            nodes = await st.refresh()
+            for n in nodes:
+                try:
+                    await st.influx.write_sample(n["node_id"], n.get("statistics") or {})
+                except Exception as e:  # per-node failures must not stop the loop
+                    log.debug("influx write_sample node %s failed: %s", n.get("node_id"), e)
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            log.warning("influx sampler cycle failed: %s", e)
+        await asyncio.sleep(600)
 
 
 async def _nightly_scheduler(app: FastAPI) -> None:

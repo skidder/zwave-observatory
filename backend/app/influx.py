@@ -6,16 +6,19 @@ is attached to that point.
 """
 from __future__ import annotations
 
+import time
 from typing import Any
 
 import httpx
 
 
 class InfluxClient:
-    def __init__(self, url: str, org: str, token: str):
+    def __init__(self, url: str, org: str, bucket: str = "homeassistant", token: str = ""):
         self.url = url.rstrip("/")
         self.org = org
+        self.bucket = bucket
         self.token = token
+        self._last_samples: dict[int, dict[str, float]] = {}
 
     def _headers(self) -> dict[str, str]:
         return {"Authorization": f"Token {self.token}",
@@ -31,19 +34,69 @@ class InfluxClient:
             r.raise_for_status()
             return parse_annotated_csv(r.text)
 
+    # ---- sampling: write cumulative counters from each node refresh ----
+    async def write_sample(self, node_id: int, stats: dict[str, Any]) -> None:
+        """Write cumulative command counters for a node as line protocol.
+
+        The sampler stores the previous sample so history queries can use
+        difference(nonNegative) to derive per-window frame counts.
+        """
+        if not self.url:
+            return
+        tx = float(stats.get("commands_tx") or 0)
+        rx = float(stats.get("commands_rx") or 0)
+        drop_rx = float(stats.get("commands_dropped_rx") or 0)
+        rssi = stats.get("rssi")
+        ts = int(time.time())
+        lines = [
+            f'zwave_frames,node_id={node_id} tx={tx},rx={rx} {ts}',
+            f'zwave_drops,node_id={node_id} dropped_rx={drop_rx} {ts}',
+        ]
+        if isinstance(rssi, (int, float)):
+            lines.append(f'zwave_rssi,node_id={node_id} rssi={rssi} {ts}')
+        async with httpx.AsyncClient(timeout=30) as c:
+            r = await c.post(f"{self.url}/api/v2/write",
+                             params={"org": self.org, "bucket": self.bucket,
+                                     "precision": "s"},
+                             headers={"Authorization": f"Token {self.token}"},
+                             content="\n".join(lines))
+            r.raise_for_status()
+        self._last_samples[node_id] = {"tx": tx, "rx": rx, "drop_rx": drop_rx}
+
     # ---- domain queries ----
     async def frames_history(self, node_id: int, days: int = 7) -> list[dict[str, Any]]:
         flux = f'''
-from(bucket: "zwave")
+from(bucket: "{self.bucket}")
   |> range(start: -{days}d)
   |> filter(fn: (r) => r._measurement == "zwave_frames" and r.node_id == "{node_id}")
   |> aggregateWindow(every: 1h, fn: sum, createEmpty: false)
 '''
         return await self.query(flux)
 
+    async def frames_all(self, days: int = 7) -> list[dict[str, Any]]:
+        """Per-node per-day frame counts derived from cumulative counters."""
+        flux = f'''
+from(bucket: "{self.bucket}")
+  |> range(start: -{days}d)
+  |> filter(fn: (r) => r._measurement == "zwave_frames" and r._field == "tx")
+  |> difference(nonNegative: true, columns: ["_value"])
+  |> aggregateWindow(every: 1d, fn: sum, createEmpty: false)
+  |> group(columns: ["node_id"])
+'''
+        rows = await self.query(flux)
+        out: list[dict[str, Any]] = []
+        for r in rows:
+            try:
+                out.append({"node_id": int(r.get("node_id")),
+                            "day": str(r.get("_time", ""))[:10],
+                            "frames": float(r.get("_value") or 0)})
+            except (TypeError, ValueError):
+                continue
+        return out
+
     async def rssi_history(self, node_id: int, days: int = 7) -> list[dict[str, Any]]:
         flux = f'''
-from(bucket: "zwave")
+from(bucket: "{self.bucket}")
   |> range(start: -{days}d)
   |> filter(fn: (r) => r._measurement == "zwave_rssi" and r.node_id == "{node_id}")
   |> aggregateWindow(every: 5m, fn: mean, createEmpty: false)
@@ -52,7 +105,7 @@ from(bucket: "zwave")
 
     async def controller_history(self, days: int = 7) -> list[dict[str, Any]]:
         flux = f'''
-from(bucket: "zwave")
+from(bucket: "{self.bucket}")
   |> range(start: -{days}d)
   |> filter(fn: (r) => r._measurement == "zwave_controller")
 '''
@@ -60,7 +113,7 @@ from(bucket: "zwave")
 
     async def drops_history(self, node_id: int, days: int = 7) -> list[dict[str, Any]]:
         flux = f'''
-from(bucket: "zwave")
+from(bucket: "{self.bucket}")
   |> range(start: -{days}d)
   |> filter(fn: (r) => r._measurement == "zwave_drops" and r.node_id == "{node_id}")
 '''
@@ -70,7 +123,7 @@ from(bucket: "zwave")
                                 node_id: int | None = None) -> float:
         filt = f' and r.node_id == "{node_id}"' if node_id is not None else ""
         flux = f'''
-from(bucket: "zwave")
+from(bucket: "{self.bucket}")
   |> range(start: -30d)
   |> filter(fn: (r) => r._measurement == "{measurement}" and r._field == "{field}"{filt})
   |> last()

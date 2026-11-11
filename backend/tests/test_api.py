@@ -27,6 +27,7 @@ def client(tmp_path, monkeypatch):
             self.jam_share = 0.03
             self.network_score = {"total": 0.95, "grade": "A"}
             self.actions = None
+            self.influx = None
             from app.actions import ActionManager
             self.actions = ActionManager(db)
 
