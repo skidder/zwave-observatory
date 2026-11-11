@@ -22,7 +22,7 @@ function verificationPending(action: RecommendationAction): string | null {
   return null;
 }
 
-function RecCard({ rec, onOpenNode }: { rec: Recommendation; onOpenNode: (id: number) => void }) {
+function RecCard({ rec, onOpenNode, onApplied }: { rec: Recommendation; onOpenNode: (id: number) => void; onApplied?: () => void }) {
   const [confirm, setConfirm] = useState<ConfirmSpec | null>(null);
   const [showTranscript, setShowTranscript] = useState(false);
   const conf = rec.confidence >= 0.8 ? ['ok', 'high'] : rec.confidence >= 0.5 ? ['warn', 'medium'] : ['danger', 'low'] as const;
@@ -32,7 +32,10 @@ function RecCard({ rec, onOpenNode }: { rec: Recommendation; onOpenNode: (id: nu
     body: `Apply: ${a.description}?`,
     confirmLabel: 'Apply',
     onConfirm: async () => {
-      await api.advisorInvestigate(rec.id);
+      // rec.id is "r{report_id}-{index}" (from the backend report adapter)
+      const m = /^r(\d+)-(\d+)$/.exec(rec.id);
+      if (m) await api.advisorApply(Number(m[1]), Number(m[2]));
+      onApplied?.();
     },
   });
 
@@ -151,7 +154,7 @@ export default function Advisor({ onOpenNode }: { onOpenNode?: (id: number) => v
       </Card>
 
       {(current?.recommendations ?? []).map((rec) => (
-        <RecCard key={rec.id} rec={rec} onOpenNode={onOpenNode ?? (() => {})} />
+        <RecCard key={rec.id} rec={rec} onOpenNode={onOpenNode ?? (() => {})} onApplied={() => { latest.reload(); ledger.reload(); }} />
       ))}
 
       {investigating && <Card><span className="dim">Investigating {investigating}…</span></Card>}

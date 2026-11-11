@@ -1,6 +1,7 @@
 """HTTP + WS routers. Secrets never returned by any endpoint."""
 from __future__ import annotations
 
+import json
 import time
 from typing import Any
 
@@ -456,6 +457,64 @@ async def advisor_investigate(request: Request) -> dict[str, Any]:
         return await advisor.investigate(question)
     except LLMError as e:
         raise HTTPException(500, str(e))
+
+
+@api.post("/advisor/apply")
+async def advisor_apply(request: Request) -> dict[str, Any]:
+    """Execute a ledgered advisor action against the live network and record
+    the outcome. Ledger is append-only; verification is recorded in-place
+    (verification_status/verification_detail columns)."""
+    st = _state(request)
+    db = _db(request)
+    body = await request.json()
+    report_id, index = int(body["report_id"]), int(body["index"])
+    rows = db.query(
+        "SELECT * FROM advisor_actions WHERE report_id=? ORDER BY id", (report_id,))
+    if index >= len(rows):
+        raise HTTPException(404, f"no ledger entry {index} for report {report_id}")
+    entry = rows[index]
+    if entry.get("verification_status") not in ("pending", "inconclusive"):
+        raise HTTPException(409, f"entry already {entry['verification_status']}")
+    action = entry["action"]
+    node_id = entry.get("node_id")
+    params = entry.get("params")
+    if isinstance(params, str):
+        try:
+            params = json.loads(params)
+        except ValueError:
+            params = {}
+    try:
+        if action == "ping" and node_id:
+            result = await st.zwjs.ping_node(node_id)
+            ok = bool(result)
+            detail = {"kind": "ping", "node_id": node_id,
+                      "responded": bool(result), "raw": result}
+        elif action == "refresh_values" and node_id:
+            result = await st.zwjs.refresh_values(node_id)
+            ok = result is not None
+            detail = {"kind": "refresh_values", "node_id": node_id}
+        elif action == "set_config" and node_id and params:
+            result = await st.zwjs.set_config_parameter(
+                node_id, params.get("parameter"), params.get("value"),
+                params.get("value_size", 1))
+            ok = result is not None
+            detail = {"kind": "set_config", "node_id": node_id,
+                      "params": params, "raw": result}
+        else:
+            ok = False
+            detail = {"kind": action, "error": "unsupported action"}
+    except Exception as e:
+        ok = False
+        detail = {"kind": action, "error": str(e)}
+    status = "verified" if ok else "failed"
+    entry_id = entry["id"]
+    db.execute(
+        "UPDATE advisor_actions SET verification_status=?, verified_ts=?, "
+        "verification_detail=? WHERE id=?",
+        (status, time.time(), json.dumps(detail), entry_id))
+    st.broadcast({"type": "ledger_update", "entry_id": entry_id,
+                  "verification_status": status})
+    return {"id": entry_id, "verification_status": status, "detail": detail}
 
 
 def _fe_report(row: dict[str, Any]) -> dict[str, Any]:

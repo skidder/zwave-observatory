@@ -39,6 +39,8 @@ export const api = {
   advisorHistory: () => request<import('./types').AdvisorReport[]>('/api/advisor/history'),
   advisorLedger: () =>
     request<{ id: string; verdict: string; blocked_reason?: string }[]>('/api/advisor/ledger'),
+  advisorApply: (reportId: number, index: number) =>
+    request(`/api/advisor/apply`, { method: 'POST', body: JSON.stringify({ report_id: reportId, index }) }),
   setupStatus: () => request<import('./types').SetupStatus>('/api/setup/status'),
   setupTest: (step: 'hass' | 'zwjs' | 'influx' | 'llm', cfg: Record<string, unknown>) =>
     request<import('./types').SetupResult>(`/api/setup/test/${step}`, {
