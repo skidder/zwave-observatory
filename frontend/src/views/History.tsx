@@ -12,7 +12,7 @@ export default function History() {
   const drops = useApi(() => api.history('drops', days), [days]);
   const rssi = useApi(() => api.history('rssi', days), [days]);
 
-  const grid = { left: 46, right: 12, top: 12, bottom: 26 };
+  const grid = { left: 46, right: 12, top: 40, bottom: 26 };
 
   const toLines = (res: { data: unknown }) => {
     const payload = res.data;
@@ -41,7 +41,7 @@ export default function History() {
     const c = arr.find((s) => s.key === 'collisions');
     return {
       grid,
-      legend: { textStyle: { color: 'var(--text-dim)', fontSize: 10 } },
+      legend: { top: 0, type: 'scroll', textStyle: { color: 'var(--text-dim)', fontSize: 10 } },
       xAxis: { type: 'category', data: timeAxis([jam?.series ?? f?.series ?? [], d?.series ?? [], c?.series ?? []]) },
       yAxis: { type: 'value', splitLine: { lineStyle: { color: 'var(--grid)' } } },
       series: [jam, f, d, c].filter(Boolean).map((s) => ({

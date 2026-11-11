@@ -50,8 +50,8 @@ export default function Overview({ onOpenNode }: { onOpenNode: (id: number) => v
     }));
     return {
       tooltip: { trigger: 'axis' },
-      legend: { textStyle: { color: 'var(--text-dim)', fontSize: 10 } },
-      grid: { left: 40, right: 8, top: 30, bottom: 24 },
+      legend: { top: 0, type: 'scroll', textStyle: { color: 'var(--text-dim)', fontSize: 10 } },
+      grid: { left: 40, right: 8, top: 56, bottom: 24 },
       xAxis: { type: 'category', data: ts, axisLine: { lineStyle: { color: 'var(--grid)' } } },
       yAxis: { type: 'value', axisLine: { lineStyle: { color: 'var(--grid)' } }, splitLine: { lineStyle: { color: 'var(--grid)' } } },
       series,
