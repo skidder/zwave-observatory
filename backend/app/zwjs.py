@@ -16,6 +16,21 @@ class ZwjsError(RuntimeError):
     pass
 
 
+# zwave-js-server node status enum -> name (values may arrive as int or str)
+_NODE_STATUS = {0: "unknown", 1: "asleep", 2: "awake", 3: "dead", 4: "alive"}
+
+
+def _status_name(v: Any) -> str | None:
+    if v is None:
+        return None
+    if isinstance(v, bool):
+        return str(v).lower()
+    if isinstance(v, int):
+        return _NODE_STATUS.get(v, str(v))
+    s = str(v)
+    return _NODE_STATUS.get(int(s)) if s.isdigit() else s.lower()
+
+
 class ZwjsClient:
     def __init__(self, ws_url: str, token: str | None = None):
         self.ws_url = ws_url
@@ -120,7 +135,7 @@ class ZwjsClient:
                 "data_rate": n.get("maxDataRate"),
                 "role": n.get("deviceRole") or n.get("deviceClass", {}).get("role"),
             },
-            "status": n.get("status"),
+            "status": _status_name(n.get("status")),
             "ready": bool(n.get("ready")),
             "is_controller_node": bool(n.get("isControllerNode")),
             "neighbors": n.get("neighbors") or [],
