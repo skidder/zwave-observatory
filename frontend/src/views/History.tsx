@@ -16,13 +16,13 @@ export default function History() {
 
   const toLines = (res: { data: unknown }) => {
     const payload = res.data;
-    const arr = (Array.isArray(payload) ? payload : payload ? [payload] : []) as { key?: string; series: { ts: string; value: number }[] }[];
-    return arr.map((s) => ({
+    const arr = (Array.isArray(payload) ? payload : payload ? [payload] : []) as { key?: string; series?: { ts: string; value: number }[] }[];
+    return arr.filter((s) => Array.isArray(s.series)).map((s) => ({
       name: s.key ?? 'series',
       type: 'line' as const,
       showSymbol: false,
       smooth: true,
-      data: s.series.map((p: { ts: string; value: number }) => [p.ts, p.value]),
+      data: (s.series ?? []).map((p) => [p.ts, p.value]),
     }));
   };
 

@@ -94,6 +94,47 @@ from(bucket: "{self.bucket}")
                 continue
         return out
 
+    async def drops_all(self, days: int = 7) -> list[dict[str, Any]]:
+        """Per-node per-day dropped-RX counts derived from cumulative counters."""
+        flux = f'''
+from(bucket: "{self.bucket}")
+  |> range(start: -{days}d)
+  |> filter(fn: (r) => r._measurement == "zwave_drops" and r._field == "dropped_rx")
+  |> difference(nonNegative: true, columns: ["_value"])
+  |> aggregateWindow(every: 1d, fn: sum, createEmpty: false)
+  |> group(columns: ["node_id"])
+'''
+        rows = await self.query(flux)
+        out: list[dict[str, Any]] = []
+        for r in rows:
+            try:
+                out.append({"node_id": int(r.get("node_id")),
+                            "day": str(r.get("_time", ""))[:10],
+                            "drops": float(r.get("_value") or 0)})
+            except (TypeError, ValueError):
+                continue
+        return out
+
+    async def rssi_all(self, days: int = 7) -> list[dict[str, Any]]:
+        """Per-node hourly mean RSSI."""
+        flux = f'''
+from(bucket: "{self.bucket}")
+  |> range(start: -{days}d)
+  |> filter(fn: (r) => r._measurement == "zwave_rssi" and r._field == "rssi")
+  |> aggregateWindow(every: 1h, fn: mean, createEmpty: false)
+  |> group(columns: ["node_id"])
+'''
+        rows = await self.query(flux)
+        out: list[dict[str, Any]] = []
+        for r in rows:
+            try:
+                out.append({"node_id": int(r.get("node_id")),
+                            "ts": str(r.get("_time", "")),
+                            "rssi": float(r.get("_value") or 0)})
+            except (TypeError, ValueError):
+                continue
+        return out
+
     async def rssi_history(self, node_id: int, days: int = 7) -> list[dict[str, Any]]:
         flux = f'''
 from(bucket: "{self.bucket}")

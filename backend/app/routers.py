@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 from typing import Any
 
@@ -13,6 +14,7 @@ from .problems import detect_controller_problems, rank_problems
 from .scoring import compute_node_score
 
 api = APIRouter(prefix="/api")
+log = logging.getLogger("zwo.routers")
 
 
 def _state(request: Request):
@@ -260,15 +262,42 @@ async def score(request: Request) -> dict[str, Any]:
 
 
 # ---- history ----
+def _series(rows: list[dict[str, Any]], id_key: str, ts_key: str, val_key: str,
+            name_map: dict[int, str] | None = None,
+            prefix: str = "Node") -> list[dict[str, Any]]:
+    """Group measurement rows into {key, series:[{ts,value}]} per node."""
+    by: dict[int, list[tuple[str, float]]] = {}
+    for r in rows:
+        try:
+            nid = int(r[id_key])
+        except (KeyError, TypeError, ValueError):
+            continue
+        ts, v = r.get(ts_key), r.get(val_key)
+        if ts is None or v is None:
+            continue
+        try:
+            by.setdefault(nid, []).append((str(ts), float(v)))
+        except (TypeError, ValueError):
+            continue
+    out = []
+    for nid, pts in sorted(by.items()):
+        name = (name_map or {}).get(nid, f"{prefix} {nid}")
+        out.append({"key": name,
+                    "series": [{"ts": t, "value": v} for t, v in sorted(pts)]})
+    return out
+
+
 @api.get("/history/frames")
 async def history_frames(request: Request, days: int = 7) -> list[dict[str, Any]]:
     st = _state(request)
     if not st.influx:
         return []
     try:
-        return await st.influx.frames_all(days)
+        rows = await st.influx.frames_all(days)
+        return _series(rows, "node_id", "day", "frames")
     except Exception as e:
-        raise HTTPException(502, str(e))
+        log.warning("history frames query failed: %s", e)
+        return []
 
 
 @api.get("/history/rssi")
@@ -277,11 +306,11 @@ async def history_rssi(request: Request, days: int = 7) -> list[dict[str, Any]]:
     if not st.influx:
         return []
     try:
-        return await st.influx.query(
-            f'from(bucket:"{st.influx.bucket}") |> range(start: -{days}d) '
-            f'|> filter(fn:(r) => r._measurement == "zwave_rssi")')
+        rows = await st.influx.rssi_all(days)
+        return _series(rows, "node_id", "ts", "rssi")
     except Exception as e:
-        raise HTTPException(502, str(e))
+        log.warning("history rssi query failed: %s", e)
+        return []
 
 
 @api.get("/history/controller")
@@ -290,9 +319,26 @@ async def history_controller(request: Request, days: int = 7) -> list[dict[str, 
     if not st.influx:
         return []
     try:
-        return await st.influx.controller_history(days)
+        frames = await st.influx.frames_all(days)
+        drops = await st.influx.drops_all(days)
     except Exception as e:
-        raise HTTPException(502, str(e))
+        log.warning("history controller query failed: %s", e)
+        return []
+    totals: dict[str, dict[str, float]] = {}
+    for r in frames:
+        d = totals.setdefault(r["day"], {"frames": 0.0, "drops": 0.0})
+        d["frames"] += r.get("frames") or 0
+    for r in drops:
+        d = totals.setdefault(r["day"], {"frames": 0.0, "drops": 0.0})
+        d["drops"] += r.get("drops") or 0
+    out: list[dict[str, Any]] = []
+    for key, field in (("frames_per_day", "frames"), ("dropped_per_day", "drops")):
+        pts = sorted(({"ts": day, "value": vals[field]}
+                      for day, vals in totals.items() if vals.get(field)),
+                     key=lambda p: p["ts"])
+        if pts:
+            out.append({"key": key, "series": pts})
+    return out
 
 
 @api.get("/history/drops")
@@ -301,11 +347,11 @@ async def history_drops(request: Request, days: int = 7) -> list[dict[str, Any]]
     if not st.influx:
         return []
     try:
-        return await st.influx.query(
-            f'from(bucket:"{st.influx.bucket}") |> range(start: -{days}d) '
-            f'|> filter(fn:(r) => r._measurement == "zwave_drops")')
+        rows = await st.influx.drops_all(days)
+        return _series(rows, "node_id", "day", "drops")
     except Exception as e:
-        raise HTTPException(502, str(e))
+        log.warning("history drops query failed: %s", e)
+        return []
 
 
 # ---- WS live ----
