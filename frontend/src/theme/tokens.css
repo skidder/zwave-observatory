@@ -9,6 +9,7 @@
   --warn: #B07D2B;
   --danger: #C0392B;
   --accent: #1A5276;
+  --accent-contrast: #1A5276;
   --edge-nlwr: #8A8580;
   --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
   --radius: 10px;
@@ -25,6 +26,7 @@
   --warn: #D9A441;
   --danger: #E05B4C;
   --accent: #4C8CB5;
+  --accent-contrast: #8FC1E3;
   --edge-nlwr: #6B7078;
   --shadow: none;
 }

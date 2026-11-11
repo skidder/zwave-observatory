@@ -5,6 +5,9 @@
   padding: 14px 16px;
 }
 
+a { color: var(--accent-contrast, var(--accent)); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
 .stagger { animation: cardIn 350ms ease both; }
 @keyframes cardIn {
   from { opacity: 0; transform: translateY(8px); }
