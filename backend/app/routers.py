@@ -33,8 +33,17 @@ async def controller(request: Request) -> dict[str, Any]:
     st = _state(request)
     ctrl = next((n for n in st.nodes if n.get("is_controller_node")), None)
     jam = st.jam_share
-    return {"controller": ctrl, "jam_share": jam,
-            "controller_problems": rank_problems(detect_controller_problems(jam))}
+    status = (ctrl or {}).get("status") or "unknown"
+    if status in ("dead", "unavailable"):
+        fe_status = "offline"
+    elif status in ("asleep", "unknown"):
+        fe_status = "degraded"
+    else:
+        fe_status = "online"
+    return {"status": fe_status,
+            "jam_share_pct": round(jam * 100),
+            "frames_per_day": 0, "dropped_per_day": 0,
+            "collisions_per_day": 0, "bg_rssi": {}}
 
 
 def _fe_node(n: dict[str, Any]) -> dict[str, Any]:
@@ -428,17 +437,60 @@ async def advisor_investigate(request: Request) -> dict[str, Any]:
         raise HTTPException(500, str(e))
 
 
+def _fe_report(row: dict[str, Any]) -> dict[str, Any]:
+    """Map an advisor_reports DB row to the frontend AdvisorReport contract."""
+    rep = row.get("report") or {}
+    ts = row.get("ts")
+    if isinstance(ts, (int, float)):
+        from datetime import datetime, timezone
+        ts_iso = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+    elif ts:
+        ts_iso = str(ts)
+    else:
+        ts_iso = _iso_now()
+    recs = []
+    actions = rep.get("recommended_actions") or []
+    for i, a in enumerate(actions):
+        a = a if isinstance(a, dict) else {}
+        recs.append({
+            "id": f"r{row.get('id')}-{i}",
+            "created": ts_iso,
+            "diagnosis": a.get("explanation") or rep.get("summary") or "",
+            "confidence": 0.5,
+            "evidence_links": [],
+            "actions": [{
+                "id": f"a{row.get('id')}-{i}",
+                "description": a.get("action") or "unknown",
+                "kind": a.get("action") or "unknown",
+                "validation": "pending",
+            }],
+            "verdict": "pending",
+        })
+    obs = "\n".join(f"- {o}" for o in rep.get("observations") or [])
+    return {
+        "id": row.get("id"),
+        "run_at": ts_iso,
+        "model": rep.get("model") or "",
+        "tokens": {"input": row.get("tokens_in") or 0,
+                   "output": row.get("tokens_out") or 0},
+        "cost_usd": 0.0,
+        "recommendations": recs,
+        "markdown": "\n\n".join(x for x in (rep.get("summary"), obs) if x),
+        "transcript": "",
+    }
+
+
 @api.get("/advisor/latest")
 async def advisor_latest(request: Request) -> dict[str, Any]:
     r = _db(request).latest_report()
     if r is None:
         raise HTTPException(404, "no advisor reports yet")
-    return r
+    return _fe_report(r)
 
 
 @api.get("/advisor/history")
 async def advisor_history(request: Request, limit: int = 50) -> list[dict[str, Any]]:
-    return _db(request).report_history(limit)
+    return [_fe_report(r) for r in _db(request).report_history(limit)]
 
 
 @api.get("/advisor/ledger")
