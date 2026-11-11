@@ -37,6 +37,9 @@ services:
     #   - .env.secrets
     volumes:
       - ./data:/data
+    # Uncomment ONLY if the entrypoint reports the data dir is not writable
+    # and you cannot chown the host directory (uid 10001 is the app user):
+    # user: "0:0"
     restart: unless-stopped
 
   # Optional: local LLM advisor via Ollama. Enable with:
