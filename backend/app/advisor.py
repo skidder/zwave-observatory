@@ -14,7 +14,7 @@ import httpx
 from .db import Database
 
 ACTIONS_ALLOWED = ["ping", "refresh_values", "re_interview", "heal_node",
-                   "set_config_parameter", "refresh_neighbors"]
+                   "set_config_parameter", "refresh_neighbors", "remove_failed_node"]
 
 ANALYZE_SCHEMA = {
     "type": "object",
@@ -188,6 +188,7 @@ def build_context_packet(nodes: list[dict[str, Any]], problems: list[dict[str, A
         lines.extend(f"- {d}" for d in dismissals)
     lines.append("## Allowed actions")
     lines.extend(f"- {a}" for a in ACTIONS_ALLOWED)
+    lines.append("- remove_failed_node is destructive: only recommend it for a node whose status is dead/failed and that the user's ledger shows unreachable (ping failed). Otherwise suggest ping or heal_node first.")
     pkt = "\n".join(lines)
     # rough truncation to token budget (~4 chars/token)
     if len(pkt) > max_tokens * 4:
@@ -206,6 +207,10 @@ def validate_action(rec: dict[str, Any], nodes_by_id: dict[int, dict[str, Any]],
     node_id = rec.get("node_id")
     if action not in ACTIONS_ALLOWED:
         errors.append(f"action '{action}' not in allowed enum")
+    if action == "remove_failed_node":
+        status = (nodes_by_id.get(node_id, {}).get("status") or "").lower()
+        if status not in ("dead", "failed"):
+            errors.append(f"remove_failed_node requires a dead/failed node, node {node_id} status is '{status}'")
     if node_id not in nodes_by_id:
         errors.append(f"node_id {node_id} does not exist")
     # param range vs device metadata (configuration parameters in node values)

@@ -186,6 +186,9 @@ class ZwjsClient:
     async def refresh_values(self, node_id: int) -> Any:
         return await self.send_command("node_refresh_values", nodeId=node_id)
 
+    async def remove_failed_node(self, node_id: int) -> Any:
+        return await self.send_command("node.remove_failed_node", nodeId=node_id)
+
     async def refresh_info(self, node_id: int) -> Any:
         return await self.send_command("node_refresh_info", nodeId=node_id)
 

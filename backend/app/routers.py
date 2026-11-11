@@ -500,6 +500,11 @@ async def advisor_apply(request: Request) -> dict[str, Any]:
             ok = result is not None
             detail = {"kind": "set_config", "node_id": node_id,
                       "params": params, "raw": result}
+        elif action == "remove_failed_node" and node_id:
+            result = await st.zwjs.remove_failed_node(node_id)
+            ok = result is not None
+            detail = {"kind": "remove_failed_node", "node_id": node_id,
+                      "raw": result}
         else:
             ok = False
             detail = {"kind": action, "error": "unsupported action"}
