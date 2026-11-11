@@ -73,9 +73,9 @@ def test_nodes_endpoint(client):
     assert r.status_code == 200
     nodes = r.json()
     assert len(nodes) == 2
-    n5 = [n for n in nodes if n["node_id"] == 5][0]
-    assert n5["statistics"]["commands_dropped_rx"] == 25
-    assert "health_score" in n5
+    n5 = [n for n in nodes if n["id"] == 5][0]
+    assert n5["stats"]["drops"] == 27
+    assert "grade" in n5
 
 
 def test_node_detail_404(client):

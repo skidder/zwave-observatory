@@ -37,6 +37,74 @@ async def controller(request: Request) -> dict[str, Any]:
             "controller_problems": rank_problems(detect_controller_problems(jam))}
 
 
+def _fe_node(n: dict[str, Any]) -> dict[str, Any]:
+    """Map a backend node to the frontend ZwaveNode contract."""
+    st = n.get("statistics") or {}
+    hs = n.get("health_score") or {}
+    status = (n.get("status") or "unknown").lower()
+    vals = n.get("values") or []
+    params = []
+    for v in vals:
+        if "config" in str((v.get("commandClass") or "")).lower() or \
+                v.get("commandClass") == 112:
+            params.append({
+                "id": v.get("property"),
+                "name": v.get("propertyName") or v.get("property"),
+                "value": v.get("value"),
+            })
+    return {
+        "id": n.get("node_id"),
+        "name": n.get("name"),
+        "loc": n.get("location"),
+        "is_controller": bool(n.get("is_controller_node")),
+        "power": "battery" if (n.get("power_source") == "battery") else "mains",
+        "sleeping": status in ("asleep",),
+        "dead": status in ("dead", "unavailable"),
+        "grade": hs.get("grade") or "F",
+        "stats": {
+            "tx": st.get("commands_tx", 0),
+            "rx": st.get("commands_rx", 0),
+            "drops": (st.get("commands_dropped_tx", 0)
+                      + st.get("commands_dropped_rx", 0)),
+            "timeouts": st.get("timeout_response", 0),
+            "rtt_ms": st.get("rtt") or 0,
+            "rssi": st.get("rssi") if st.get("rssi") is not None else 0,
+            "snr": st.get("snr") if st.get("snr") is not None else 0,
+        },
+        "routes": {
+            "direct": not (n.get("routes") or {}).get("lwr"),
+            "repeaters": [r.get("nodeId") for r in
+                          [(n.get("routes") or {}).get("lwr") or {},
+                           (n.get("routes") or {}).get("nlwr") or {}]
+                          if isinstance(r, dict) and r.get("nodeId")],
+        },
+        "neighbors": n.get("neighbors") or [],
+        "lwr_rssi": (n.get("statistics") or {}).get("lwr_rssi"),
+        "nlwr_rssi": None,
+        "ha_entities": [
+            {"entity_id": e.get("entity_id"), "state": "", "name": e.get("name")}
+            for e in n.get("entities") or []],
+        "params": params,
+        "problems": n.get("problems") or [],
+        "last_seen": n.get("last_seen"),
+    }
+
+
+def _fe_mesh_node(n: dict[str, Any]) -> dict[str, Any]:
+    hs = n.get("health_score") or {}
+    status = (n.get("status") or "unknown").lower()
+    return {
+        "id": n.get("node_id"),
+        "label": n.get("name") or f"Node {n.get('node_id')}",
+        "is_controller": bool(n.get("is_controller_node")),
+        "power": "battery" if (n.get("power_source") == "battery") else "mains",
+        "grade": hs.get("grade") or "F",
+        "sleeping": status == "asleep",
+        "dead": status in ("dead", "unavailable"),
+        "problems": len(n.get("problems") or []),
+    }
+
+
 @api.get("/nodes")
 async def nodes(request: Request) -> list[dict[str, Any]]:
     st = _state(request)
@@ -45,7 +113,7 @@ async def nodes(request: Request) -> list[dict[str, Any]]:
             await st.refresh()
         except Exception as e:
             raise HTTPException(503, f"cannot reach zwave-js-server: {e}")
-    return st.nodes
+    return [_fe_node(n) for n in st.nodes]
 
 
 @api.get("/nodes/{node_id}")
@@ -54,7 +122,7 @@ async def node_detail(node_id: int, request: Request) -> dict[str, Any]:
     n = st.nodes_by_id.get(node_id)
     if n is None:
         raise HTTPException(404, f"node {node_id} not found")
-    return n
+    return _fe_node(n)
 
 
 # ---- actions ----
@@ -107,18 +175,10 @@ async def mesh(request: Request) -> dict[str, Any]:
             await st.refresh()
         except Exception as e:
             raise HTTPException(503, f"cannot reach zwave-js-server: {e}")
-    nodes: list[dict[str, Any]] = []
-    edges: list[dict[str, Any]] = []
+    nodes = [_fe_mesh_node(n) for n in st.nodes]
+    edges = []
     for n in st.nodes:
         nid = n["node_id"]
-        nodes.append({
-            "node_id": nid,
-            "name": n.get("name"),
-            "status": n.get("status"),
-            "is_controller_node": n.get("is_controller_node", False),
-            "power_source": n.get("power_source"),
-            "health_score": n.get("health_score"),
-        })
         seen: set[int] = set()
         for target in n.get("neighbors") or []:
             if isinstance(target, int) and target != nid and target not in seen:
@@ -148,7 +208,24 @@ async def problems(request: Request) -> list[dict[str, Any]]:
 
 @api.get("/score")
 async def score(request: Request) -> dict[str, Any]:
-    return _state(request).get_score()
+    st = _state(request)
+    s = st.get_score()
+    net = s.get("network") or {}
+    total = net.get("total")
+    # Frontend contract: {score 0-100, grade, penalties, history}
+    history = [
+        {"ts": row["ts_iso"] if "ts_iso" in row else str(row.get("ts", "")),
+         "value": round((row.get("total") or 0) * 100)}
+        for row in st.db.score_history(days=14)
+    ] if hasattr(st.db, "score_history") else []
+    return {
+        "score": round((total or 0) * 100),
+        "grade": net.get("grade") or "F",
+        "penalties": (net.get("penalties")
+                      or [p for v in (s.get("nodes") or {}).values()
+                          for p in []]),
+        "history": history,
+    }
 
 
 # ---- history ----
