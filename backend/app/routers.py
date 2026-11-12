@@ -453,7 +453,11 @@ async def advisor_analyze(request: Request) -> dict[str, Any]:
                                    rec.get("explanation"),
                                    verification_status="pending" if not errs else "inconclusive")
     st.broadcast({"type": "advisor_report", "report_id": out["report_id"]})
-    return out
+    row = {"id": out["report_id"], "report": out["report"],
+           "tokens_in": out.get("tokens_in") or 0,
+           "tokens_out": out.get("tokens_out") or 0,
+           "ts": time.time()}
+    return {"report_id": out["report_id"], **_fe_report(row)}
 
 
 @api.post("/advisor/investigate")
@@ -498,9 +502,16 @@ async def advisor_investigate(request: Request) -> dict[str, Any]:
                           "get_automation_refs": get_automation_refs,
                           "ping": ping}
     try:
-        return await advisor.investigate(question)
+        inv = await advisor.investigate(question)
     except LLMError as e:
         raise HTTPException(500, str(e))
+    row = {"id": None, "report": {"summary": inv.get("summary") or "",
+                                  "observations": [], "recommended_actions": [],
+                                  "model": inv.get("model") or ""},
+           "tokens_in": inv.get("tokens_in") or 0,
+           "tokens_out": inv.get("tokens_out") or 0,
+           "ts": time.time()}
+    return _fe_report(row)
 
 
 @api.post("/advisor/apply")

@@ -142,7 +142,7 @@ export default function Advisor({ onOpenNode }: { onOpenNode?: (id: number) => v
               <>
                 <span>run {new Date(current.run_at).toLocaleString()}</span>
                 <span>· {current.model}</span>
-                <span className="num">· {current.tokens.input}+{current.tokens.output} tok · ${current.cost_usd.toFixed(4)}</span>
+                <span className="num">· {current.tokens ? `${current.tokens.input ?? 0}+${current.tokens.output ?? 0} tok` : 'token usage unavailable'}{current.cost_usd != null ? ` · $${current.cost_usd.toFixed(4)}` : ''}</span>
               </>
             )}
           </div>
