@@ -72,11 +72,9 @@ function RecCard({ rec, onOpenNode, onApplied }: { rec: Recommendation; onOpenNo
               {pending && <div className="dim" style={{ fontSize: '0.8rem' }}>{pending}</div>}
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
-              <Btn disabled={a.validation === 'failed' || !!a.applied || !!pending}
+              <Btn kind="primary" disabled={a.validation === 'failed' || !!a.applied || !!pending}
                 title={a.validation === 'failed' ? a.validation_error : undefined}
-                onClick={() => applyAction(a)}>Apply</Btn>
-              <Btn kind="primary" disabled={a.validation === 'failed' || !!pending}
-                onClick={() => applyAction(a)}>Fix</Btn>
+                onClick={() => applyAction(a)}>{a.applied ? 'Applied' : 'Fix'}</Btn>
             </div>
           </div>
         );
