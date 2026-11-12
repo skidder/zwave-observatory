@@ -24,8 +24,9 @@ _READABLE_CC = 112  # Configuration CC
 
 
 class ActionManager:
-    def __init__(self, db: Database):
+    def __init__(self, db: Database, emit=None):
         self.db = db
+        self.emit = emit or (lambda *a, **k: None)
         self._mutating_lock = asyncio.Lock()
         self._in_flight: str | None = None
 
@@ -69,6 +70,8 @@ class ActionManager:
             else:
                 result = await self._execute(client, action, node_id, params)
         except Exception as e:
+            self.emit({"type": "action_event", "ts": time.time(), "action": action,
+                       "node_id": node_id, "message": f"failed: {e}", "level": "error"})
             self.db.add_audit(actor=actor, action=action, node_id=node_id,
                               params_before=params, result={"status": "error", "error": str(e)},
                               source="api")
@@ -77,14 +80,27 @@ class ActionManager:
                           params_before=params, params_after=result.get("params_after"),
                           result={"status": "ok", "result": result.get("result")},
                           source="api")
+        self.emit({"type": "action_event", "ts": time.time(), "action": action,
+                   "node_id": node_id, "message": "completed", "level": "ok"})
         if action == "heal_node":
             self._schedule_post_heal_reread(node_id)
         return result
 
     async def _execute(self, client: ZwjsClient, action: str, node_id: int,
                        params: dict[str, Any]) -> dict[str, Any]:
+        def ev(message: str, **extra: Any) -> None:
+            self.emit({"type": "action_event", "ts": time.time(),
+                       "action": action, "node_id": node_id, "message": message, **extra})
+
+        ev("started")
         if action == "ping":
+            ev("pinging node over the Z-Wave mesh...")
             r = await client.ping_node(node_id)
+            if isinstance(r, dict):
+                reply = r.get("status", r)
+            else:
+                reply = r if r is not None else "no response payload (likely awake, no callback)"
+            ev(f"ping replied: {reply}")
             return {"action": action, "node_id": node_id, "result": r}
 
         if action == "refresh_values":
@@ -107,12 +123,18 @@ class ActionManager:
         if action == "set_config_parameter":
             param = int(params["parameter"])
             value = params["value"]
+            ev("reading current value of parameter {p}...".format(p=param))
             before = await self._read_param(client, node_id, param)
+            ev(f"current value: {before.get('value') if before else 'unknown'}")
+            ev(f"writing parameter {param} = {value}...")
             await client.set_config_parameter(node_id, param, value,
                                               params.get("value_size"))
             await asyncio.sleep(0.5)
+            ev(f"re-reading parameter {param} to verify...")
             after = await self._read_param(client, node_id, param)
             verified = after is not None and str(after.get("value")) == str(value)
+            ev(f"readback value: {after.get('value') if after else 'unknown'} "
+               f"({'verified' if verified else 'NOT verified'})")
             return {
                 "action": action, "node_id": node_id,
                 "parameter": param,

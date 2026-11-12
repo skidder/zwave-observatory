@@ -28,7 +28,7 @@ class AppState:
         self.influx = InfluxClient(cfg.influx_url, cfg.influx_org,
                                    cfg.influx_bucket,
                                    cfg.influx_token or "") if cfg.influx_configured() else None
-        self.actions = ActionManager(db)
+        self.actions = ActionManager(db, emit=self.broadcast)
         self.nodes: list[dict[str, Any]] = []
         self.nodes_by_id: dict[int, dict[str, Any]] = {}
         self.prev_stats: dict[int, dict[str, Any]] = {}

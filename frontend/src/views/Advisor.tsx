@@ -1,8 +1,36 @@
 import { useState } from 'react';
 import { api } from '../api/client';
-import { useApi } from '../hooks/useApp';
+import { useApi, useLiveFeed } from '../hooks/useApp';
 import { Card, Btn, ConfirmModal, Pill, type ConfirmSpec } from '../components/ui';
 import type { AdvisorReport, Recommendation, RecommendationAction } from '../api/types';
+
+function LiveActivity() {
+  const { events, connected } = useLiveFeed(50);
+  const actionEvents = events.filter((e) => e.type === 'action_event') as
+    { ts: number; action: string; node_id: number; message: string; level?: string }[];
+  if (actionEvents.length === 0) return null;
+  return (
+    <Card>
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <h3 style={{ margin: 0 }}>Live activity</h3>
+        <span className="dim" style={{ fontSize: '0.8rem' }}>{connected ? 'live' : 'reconnecting...'}</span>
+      </div>
+      <pre style={{ margin: 0, maxHeight: 240, overflowY: 'auto', fontSize: '0.85rem', lineHeight: 1.5 }}>
+        {actionEvents.slice(-30).map((e, i) => (
+          <div key={i} style={{
+            display: 'flex', gap: 10,
+            color: e.level === 'error' ? 'var(--danger, #C0392B)' : undefined,
+          }}>
+            <span className="dim" style={{ flexShrink: 0 }}>{new Date(e.ts * 1000).toLocaleTimeString()}</span>
+            <span style={{ flexShrink: 0 }}>node {e.node_id}</span>
+            <span style={{ flexShrink: 0 }} className="dim">[{e.action}]</span>
+            <span>{e.message}</span>
+          </div>
+        ))}
+      </pre>
+    </Card>
+  );
+}
 
 /** Client-side rate limit: one re-run per 15 minutes. */
 const RERUN_COOLDOWN_MS = 15 * 60 * 1000;
@@ -132,6 +160,7 @@ export default function Advisor({ onOpenNode }: { onOpenNode?: (id: number) => v
 
   return (
     <div className="grid" style={{ gridTemplateColumns: 'minmax(0,1fr)' }}>
+      <LiveActivity />
       <Card>
         <div className="row" style={{ justifyContent: 'space-between' }}>
           <h3>Advisor</h3>
