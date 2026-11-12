@@ -174,7 +174,7 @@ export default function Advisor({ onOpenNode }: { onOpenNode?: (id: number) => v
             {(history.data ?? []).flatMap((r) =>
               r.recommendations.map((rec) => (
                 <tr key={rec.id}>
-                  <td className="num">{new Date(r.run_at).toLocaleDateString()}</td>
+                  <td className="num">{new Date(r.run_at).toLocaleString()}</td>
                   <td>{rec.diagnosis}</td>
                   <td>{rec.verdict ?? 'pending'}</td>
                   <td className="dim">{rec.blocked_reason ?? ''}</td>
